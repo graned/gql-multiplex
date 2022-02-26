@@ -3,8 +3,9 @@ import morgan from 'morgan'
 import cors from 'cors'
 import { Logger } from 'tslog'
 // import expressWs from 'express-ws'
-import graphqlRouter from './gql.router'
+import { GraphqlRouter } from './gql.router'
 import * as WebSocket from 'ws'
+
 import * as http from 'http'
 
 class SubscriptionServer {
@@ -28,7 +29,7 @@ class SubscriptionServer {
       ws.on('message', (message: string) => {
         //log the received message and send it back to the client
         console.log('received: %s', message)
-        ws.send(`Hello, you sent -> ${message}`)
+        // ws.send(`Hello, you sent -> ${message}`)
       })
 
       // setInterval(() => {
@@ -41,8 +42,12 @@ class SubscriptionServer {
       // }, 10000)
 
       //send immediatly a feedback to the incoming connection    
-      ws.send('Hi there, I am a WebSocket server')
+      // ws.send({ msg: 'Hi there, I am a WebSocket server' })
     })
+  }
+
+  get wss() {
+    return this._wss
   }
 }
 
@@ -84,7 +89,7 @@ export class ApiServer {
 
     // this._app.use("/ws-stuff", router)
 
-    this._app.use('/graphql', graphqlRouter)
+    this._app.use('/graphql', GraphqlRouter.createRouter(this._subscriptionServer.wss))
     // this._app.ws('/helo', (ws, req) => {
     //   ws.on('message', function (message) {
     //     //log the received message and send it back to the client

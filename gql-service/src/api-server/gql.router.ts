@@ -1,34 +1,48 @@
 import express from 'express'
 import { graphqlHTTP } from 'express-graphql'
-// import { useServer } from 'graphql-ws/lib/use/ws'
+import { useServer } from 'graphql-ws/lib/use/ws'
+
+const { mergeTypeDefs, mergeResolvers } = require('@graphql-tools/merge')
+const { buildSchema, print } = require('graphql')
+
+import gqlSchema from './gql.schema'
+import { GqlResolver } from './gql.resolvers'
 
 
-// function createGraphqlRouter(app: any): express.Router {
-const graphqlRouter = express.Router({ mergeParams: true })
-graphqlRouter.get('/', (req, res) => {
-    console.log('aqui?');
+export class GraphqlRouter {
+    static createRouter(wss: any): express.Router {
+        const graphqlRouter: express.Router = express.Router({ mergeParams: true })
 
-    // ws.on('message', function (message) {
-    //     //log the received message and send it back to the client
-    //     console.log('received: %s', message)
-    //     ws.send(`Hello, you sent -> ${message}`)
-    // })
-})
-// graphqlRouter.ws('/subscriptions/notes', (ws, req) => { })
+        const gqlResolver = new GqlResolver()
 
-// graphqlRouter.use('/', graphqlHTTP({
-//     schema: graphqlServerDefinitions.schema,
-//     rootValue: graphqlServerDefinitions.resolvers,
-//     // graphql: true,
-//     customFormatErrorFn: (error) => {
-//         return {
-//             message: error.message,
-//             stack: error.stack ? error.stack.split('\n') : [],
-//             path: error.path
-//         }
-//     }
-// }))
-//     return graphqlRouter
-// }
+        const types = mergeTypeDefs([gqlSchema])
+        const resolvers = mergeResolvers([{
+            createNote: gqlResolver.createNote,
+            newNoteCreated: gqlResolver.newNoteCreated,
+            getNotes: gqlResolver.getNotes
+        }])
 
-export default graphqlRouter
+        graphqlRouter.use('/', graphqlHTTP({
+            schema: buildSchema(print(types)),
+            rootValue: resolvers,
+            customFormatErrorFn: (error) => {
+                return {
+                    message: error.message,
+                    stack: error.stack ? error.stack.split('\n') : [],
+                    path: error.path
+                }
+            }
+        }))
+
+        // Uses current wss server to expose subscriptions
+        useServer({
+            schema: buildSchema(print(types)),
+            roots: {
+                mutation: { createNote: gqlResolver.createNote },
+                subscription: { newNoteCreated: gqlResolver.newNoteCreated }
+            }
+        }, wss)
+
+        return graphqlRouter
+    }
+}
